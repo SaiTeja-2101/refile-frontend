@@ -9,7 +9,8 @@ import {
   History as HistoryIcon,
   ChevronLeft,
   FilePen,
-  LogOut
+  LogOut,
+  Layers3
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -119,6 +120,38 @@ export function Sidebar() {
                 className="overflow-hidden whitespace-nowrap"
               >
                 Chat
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </button>
+
+        {/* Presets Button */}
+        <button 
+          className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all"
+          style={{
+            color: 'var(--muted-foreground)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--accent)';
+            e.currentTarget.style.color = 'var(--accent-foreground)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = 'var(--muted-foreground)';
+          }}
+          onClick={() => window.location.href = '/presets'}
+        >
+          <Layers3 className="h-5 w-5 shrink-0" />
+          <AnimatePresence>
+            {isExpanded && (
+              <motion.span
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: "auto" }}
+                exit={{ opacity: 0, width: 0 }}
+                transition={{ duration: 0.15 }}
+                className="overflow-hidden whitespace-nowrap"
+              >
+                Community Presets
               </motion.span>
             )}
           </AnimatePresence>
