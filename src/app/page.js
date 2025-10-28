@@ -5,8 +5,15 @@ import { Paperclip, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Navbar } from "@/components/navbar";
+import { Sidebar } from "@/components/sidebar";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function Home() {
+  const { isAuthenticated } = useAuth();
+  
+  // Debug logging
+  console.log("🔐 Auth Status:", isAuthenticated);
+  
   const features = [
     "File Conversion",
     "Smart Extract",
@@ -24,9 +31,15 @@ export default function Home() {
       {/* Subtle gradient glow effect */}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(128,128,128,0.05),transparent_50%)]" />
       
-      <Navbar />
+      {/* Conditionally render Sidebar or Navbar */}
+      {isAuthenticated ? <Sidebar /> : <Navbar />}
 
-      <main className="relative flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-4 py-16">
+      <main 
+        className="relative flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-4 py-16 transition-all duration-300"
+        style={{
+          marginLeft: isAuthenticated ? '64px' : '0'
+        }}
+      >
         {/* Center Content */}
         <div className="w-full max-w-4xl space-y-8">
           {/* Logo */}
