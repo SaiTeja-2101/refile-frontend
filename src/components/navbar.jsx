@@ -1,19 +1,73 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Moon, Sun, Search, Settings, User, History } from "lucide-react";
+import { Moon, Sun, Search, Settings, User, History, LogOut } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 
 export function Navbar() {
+  const [user, setUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { theme, setTheme } = useTheme();
 
-  // Prevent hydration mismatch
+  // Check session on component mount and set up periodic checks
   useEffect(() => {
     setMounted(true);
+    checkSession();
+    
+    // Check session every 5 minutes
+    const interval = setInterval(checkSession, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
+
+  const checkSession = async () => {
+    try {
+      const response = await fetch('/api/session');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.user) {
+          setUser(data.user);
+          setIsLoggedIn(true);
+        } else {
+          setUser(null);
+          setIsLoggedIn(false);
+        }
+      } else {
+        setUser(null);
+        setIsLoggedIn(false);
+      }
+    } catch (error) {
+      console.error('Error checking session:', error);
+      setUser(null);
+      setIsLoggedIn(false);
+    }
+  };
+
+  const handleLogin = () => {
+    window.location.href = '/login/google';
+  };
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      const response = await fetch('/api/logout', {
+        method: 'POST',
+      });
+      
+      if (response.ok || response.redirected) {
+        setUser(null);
+        setIsLoggedIn(false);
+        // Redirect to home page
+        window.location.href = '/';
+      }
+    } catch (error) {
+      console.error('Error logging out:', error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
@@ -86,9 +140,39 @@ export function Navbar() {
               <Button variant="ghost" size="icon" className="hidden md:inline-flex">
                 <History className="h-5 w-5" />
               </Button>
-              <Button variant="ghost" size="icon">
-                <User className="h-5 w-5" />
-              </Button>
+              
+              {/* Profile Picture and Logout Menu */}
+              <div className="flex items-center gap-2">
+                {user?.picture ? (
+                  <div className="relative">
+                    <img
+                      src={user.picture}
+                      alt={user.name || 'Profile'}
+                      className="h-8 w-8 rounded-full border-2 border-gray-200 dark:border-gray-700"
+                      title={user.name || user.email}
+                    />
+                  </div>
+                ) : (
+                  <Button variant="ghost" size="icon">
+                    <User className="h-5 w-5" />
+                  </Button>
+                )}
+                
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  title="Logout"
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950"
+                >
+                  {isLoggingOut ? (
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-red-600" />
+                  ) : (
+                    <LogOut className="h-5 w-5" />
+                  )}
+                </Button>
+              </div>
             </>
           ) : (
             <>
@@ -99,6 +183,7 @@ export function Navbar() {
                   borderColor: 'var(--border)',
                   color: 'var(--foreground)'
                 }}
+                onClick={handleLogin}
               >
                 <User className="h-4 w-4" />
                 Sign up
@@ -109,6 +194,7 @@ export function Navbar() {
                   backgroundColor: 'var(--primary)',
                   color: 'var(--primary-foreground)'
                 }}
+                onClick={handleLogin}
               >
                 Sign in
               </Button>
