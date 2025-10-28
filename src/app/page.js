@@ -1,18 +1,98 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Paperclip, ArrowRight } from "lucide-react";
+import { useState } from "react";
+import { Paperclip, ArrowRight, Upload, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Navbar } from "@/components/navbar";
 import { Sidebar } from "@/components/sidebar";
+import { FileUpload } from "@/components/file-upload";
+import { AIResponse } from "@/components/ai-response";
 import { useAuth } from "@/contexts/auth-context";
 
 export default function Home() {
   const { isAuthenticated } = useAuth();
+  const [showUpload, setShowUpload] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
   
   // Debug logging
   console.log("🔐 Auth Status:", isAuthenticated);
+
+  const handleQuickUpload = async (files, prompt) => {
+    setIsProcessing(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const API_URL = 'http://localhost:8000';
+      const userId = isAuthenticated ? 'authenticated_user' : `guest_${Date.now()}`;
+      
+      console.log("📤 Step 1: Uploading files...");
+      
+      // Step 1: Upload files
+      const uploadFormData = new FormData();
+      files.forEach((file) => {
+        uploadFormData.append('files', file);
+      });
+
+      const uploadResponse = await fetch(`${API_URL}/api/upload`, {
+        method: 'POST',
+        headers: {
+          'x-user-id': userId,
+        },
+        body: uploadFormData,
+      });
+
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        throw new Error(`Upload failed: ${errorText}`);
+      }
+
+      const uploadResult = await uploadResponse.json();
+      console.log("✅ Upload successful:", uploadResult);
+      
+      // Step 2: Process with AI
+      console.log("🤖 Step 2: Processing with AI...");
+      
+      const fileNames = uploadResult.files.map(f => f.original_filename);
+      
+      const processFormData = new FormData();
+      processFormData.append('prompt', prompt);
+      processFormData.append('uploaded_files', JSON.stringify(fileNames));
+
+      const processResponse = await fetch(`${API_URL}/api/process`, {
+        method: 'POST',
+        headers: {
+          'x-user-id': userId,
+        },
+        body: processFormData,
+      });
+
+      if (!processResponse.ok) {
+        const errorText = await processResponse.text();
+        throw new Error(`AI Processing failed: ${errorText}`);
+      }
+
+      const processResult = await processResponse.json();
+      console.log("✅ AI Response received:", processResult);
+
+      // Display the AI response
+      setResult({
+        status: "ok",
+        files: uploadResult.files,
+        ai_response: processResult.ai_response
+      });
+
+    } catch (err) {
+      console.error("❌ Processing error:", err);
+      setError(err.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
   
   const features = [
     "File Conversion",
@@ -68,61 +148,109 @@ export default function Home() {
             <h1 className="text-5xl font-bold md:text-6xl" style={{ color: 'var(--foreground)' }}>ReFile</h1>
           </motion.div>
 
-          {/* Search Bar */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="relative"
-          >
-            <div 
-              className="group relative flex items-center rounded-full p-3 shadow-2xl backdrop-blur-sm transition-all hover:shadow-lg"
-              style={{
-                border: '1px solid var(--border)',
-                backgroundColor: 'var(--card)',
-              }}
+          {/* Search Bar or Upload Section */}
+          {!showUpload ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="relative"
             >
-              {/* File Upload Button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="ml-1 h-10 w-10 hover:bg-transparent"
-                style={{ color: 'var(--muted-foreground)' }}
-                aria-label="Attach file"
-                onClick={() => document.getElementById('file-input').click()}
-              >
-                <Paperclip className="h-5 w-5" />
-              </Button>
-              <input
-                id="file-input"
-                type="file"
-                className="hidden"
-                multiple
-              />
-
-              {/* Input */}
-              <Input
-                type="text"
-                placeholder="What do you want to convert?"
-                className="h-12 flex-1 border-0 bg-transparent px-4 text-base focus-visible:ring-0 focus-visible:ring-offset-0"
-                style={{ 
-                  color: 'var(--foreground)',
-                }}
-              />
-
-              {/* Submit Button */}
-              <Button
-                size="icon"
-                className="h-12 w-12 rounded-full"
+              <div 
+                className="group relative flex items-center rounded-full p-3 shadow-2xl backdrop-blur-sm transition-all hover:shadow-lg"
                 style={{
-                  backgroundColor: 'var(--primary)',
-                  color: 'var(--primary-foreground)'
+                  border: '1px solid var(--border)',
+                  backgroundColor: 'var(--card)',
                 }}
               >
-                <ArrowRight className="h-5 w-5" />
-              </Button>
-            </div>
-          </motion.div>
+                {/* File Upload Button */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="ml-1 h-10 w-10 hover:bg-transparent"
+                  style={{ color: 'var(--muted-foreground)' }}
+                  aria-label="Upload files"
+                  onClick={() => setShowUpload(true)}
+                >
+                  <Upload className="h-5 w-5" />
+                </Button>
+
+                {/* Input */}
+                <Input
+                  type="text"
+                  placeholder="What do you want to convert? Click upload to get started!"
+                  className="h-12 flex-1 border-0 bg-transparent px-4 text-base focus-visible:ring-0 focus-visible:ring-offset-0"
+                  style={{ 
+                    color: 'var(--foreground)',
+                  }}
+                  onFocus={() => setShowUpload(true)}
+                />
+
+                {/* Submit Button */}
+                <Button
+                  size="icon"
+                  className="h-12 w-12 rounded-full"
+                  style={{
+                    backgroundColor: 'var(--primary)',
+                    color: 'var(--primary-foreground)'
+                  }}
+                  onClick={() => setShowUpload(true)}
+                >
+                  <ArrowRight className="h-5 w-5" />
+                </Button>
+              </div>
+            </motion.div>
+          ) : (
+            /* Upload Interface */
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="w-full max-w-2xl mx-auto"
+            >
+              <div className="rounded-xl border bg-card shadow-lg p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-full bg-primary/10 p-3">
+                      <Sparkles className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold">AI File Processing</h2>
+                      <p className="text-sm text-muted-foreground">
+                        Upload files and get AI-generated commands
+                      </p>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      setShowUpload(false);
+                      setResult(null);
+                      setError(null);
+                    }}
+                  >
+                    Back to Search
+                  </Button>
+                </div>
+
+                <FileUpload onUpload={handleQuickUpload} isUploading={isProcessing} />
+
+                {error && (
+                  <div className="mt-4 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">
+                    <p className="font-medium">Error:</p>
+                    <p className="text-sm">{error}</p>
+                  </div>
+                )}
+
+                {result && (
+                  <div className="mt-6">
+                    <AIResponse result={result} status="completed" />
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
 
           {/* Feature Pills */}
           <motion.div

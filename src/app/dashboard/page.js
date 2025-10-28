@@ -1,109 +1,228 @@
-import { getCurrentSession } from "@/lib/server/session";
-import { redirect } from "next/navigation";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/navbar";
+import { FileUpload } from "@/components/file-upload";
+import { AIResponse } from "@/components/ai-response";
+import { uploadFiles, listPrompts } from "@/services/api";
+import { useStatusPolling } from "@/hooks/use-status-polling";
+import { FileText, Upload, History, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FileText, Upload, History, Settings } from "lucide-react";
 
-export default async function Dashboard() {
-  const { session, user } = await getCurrentSession();
+export default function Dashboard() {
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState(null);
+  const [recentPrompts, setRecentPrompts] = useState([]);
+  const [error, setError] = useState(null);
+  const router = useRouter();
 
-  // Redirect to home if not authenticated
-  if (!session) {
-    redirect("/");
+  // Fetch session on mount
+  useEffect(() => {
+    async function checkSession() {
+      try {
+        const res = await fetch("/api/session");
+        const data = await res.json();
+
+        if (!data.session || !data.user) {
+          router.push("/");
+          return;
+        }
+
+        setUser(data.user);
+        // Load recent prompts
+        loadRecentPrompts(data.user.id);
+      } catch (err) {
+        console.error("Session check failed:", err);
+        router.push("/");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    checkSession();
+  }, [router]);
+
+  const loadRecentPrompts = async (userId) => {
+    try {
+      const response = await listPrompts(userId);
+      if (response.status === "ok" && response.items) {
+        setRecentPrompts(response.items.slice(0, 5)); // Show last 5
+      }
+    } catch (err) {
+      console.error("Failed to load prompts:", err);
+    }
+  };
+
+  const handleUpload = async (files, prompt) => {
+    if (!user) return;
+
+    setIsUploading(true);
+    setError(null);
+    setUploadResult(null);
+
+    try {
+      const result = await uploadFiles(files, prompt, user.id);
+
+      if (result.status === "ok") {
+        setUploadResult(result);
+        // Reload recent prompts
+        await loadRecentPrompts(user.id);
+      }
+    } catch (err) {
+      console.error("Upload failed:", err);
+      setError(err.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleReset = () => {
+    setUploadResult(null);
+    setError(null);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
   }
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
+
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+            <Sparkles className="h-8 w-8 text-primary" />
             Welcome back, {user.name}!
           </h1>
           <p className="text-muted-foreground mt-2">
-            Manage your files and conversions from your dashboard.
+            Upload files and let AI generate the perfect command for your media processing needs
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {/* Upload Files Card */}
-          <div className="rounded-lg border bg-card p-6 shadow-sm">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="rounded-full bg-primary/10 p-3">
-                <Upload className="h-6 w-6 text-primary" />
+        <div className="grid gap-8 lg:grid-cols-2">
+          {/* Left Column: Upload */}
+          <div className="space-y-6">
+            <div className="rounded-lg border bg-card p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="rounded-full bg-primary/10 p-3">
+                  <Upload className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold">Upload & Process</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Upload files and describe what you need
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold">Upload Files</h3>
-                <p className="text-sm text-muted-foreground">
-                  Start a new conversion
-                </p>
-              </div>
+
+              <FileUpload onUpload={handleUpload} isUploading={isUploading} />
+
+              {error && (
+                <div className="mt-4 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">
+                  <p className="font-medium">Error:</p>
+                  <p className="text-sm">{error}</p>
+                </div>
+              )}
             </div>
-            <Button className="w-full">
-              Upload New File
-            </Button>
+
+            {/* Recent Files */}
+            {recentPrompts.length > 0 && (
+              <div className="rounded-lg border bg-card p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <History className="h-5 w-5 text-blue-500" />
+                  <h3 className="font-semibold">Recent Uploads</h3>
+                </div>
+                <div className="space-y-2">
+                  {recentPrompts.map((item) => (
+                    <div
+                      key={item.id}
+                      className="p-3 rounded-lg bg-muted/50 border cursor-pointer hover:bg-muted transition-colors"
+                      onClick={() => setUploadResult({ id: item.id, ai_response: item })}
+                    >
+                      <p className="text-sm font-medium truncate">{item.prompt}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.original_filename} • {new Date(item.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Recent Files Card */}
-          <div className="rounded-lg border bg-card p-6 shadow-sm">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="rounded-full bg-blue-500/10 p-3">
-                <FileText className="h-6 w-6 text-blue-500" />
-              </div>
-              <div>
-                <h3 className="font-semibold">Recent Files</h3>
-                <p className="text-sm text-muted-foreground">
-                  View your latest conversions
-                </p>
-              </div>
-            </div>
-            <Button variant="outline" className="w-full">
-              View Recent Files
-            </Button>
-          </div>
+          {/* Right Column: AI Response */}
+          <div className="space-y-6">
+            {uploadResult ? (
+              <div className="rounded-lg border bg-card p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-full bg-green-500/10 p-3">
+                      <Sparkles className="h-6 w-6 text-green-500" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold">AI Generated Command</h2>
+                      <p className="text-sm text-muted-foreground">
+                        Ready to execute
+                      </p>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={handleReset}>
+                    New Upload
+                  </Button>
+                </div>
 
-          {/* Conversion History Card */}
-          <div className="rounded-lg border bg-card p-6 shadow-sm">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="rounded-full bg-green-500/10 p-3">
-                <History className="h-6 w-6 text-green-500" />
+                <AIResponse 
+                  result={uploadResult} 
+                  status={uploadResult.ai_response?.ai_processing_status || "completed"} 
+                />
               </div>
-              <div>
-                <h3 className="font-semibold">History</h3>
+            ) : (
+              <div className="rounded-lg border bg-card p-12 flex flex-col items-center justify-center text-center">
+                <FileText className="h-16 w-16 text-muted-foreground/50 mb-4" />
+                <h3 className="text-lg font-semibold text-muted-foreground mb-2">
+                  No Results Yet
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  Browse all conversions
+                  Upload files and provide a prompt to get started
                 </p>
               </div>
-            </div>
-            <Button variant="outline" className="w-full">
-              View History
-            </Button>
+            )}
           </div>
         </div>
 
-        {/* User Info Section */}
-        <div className="mt-8 rounded-lg border bg-card p-6">
-          <h2 className="text-xl font-semibold mb-4">Account Information</h2>
-          <div className="flex items-start gap-4">
-            {user.picture && (
-              <img 
-                src={user.picture} 
-                alt={user.name}
-                className="h-16 w-16 rounded-full"
-              />
-            )}
-            <div className="space-y-2">
-              <div>
-                <span className="font-medium">Name:</span> {user.name}
-              </div>
-              <div>
-                <span className="font-medium">Email:</span> {user.email}
-              </div>
-              <div>
-                <span className="font-medium">User ID:</span> {user.id}
-              </div>
+        {/* Stats Section */}
+        <div className="mt-12 grid gap-6 md:grid-cols-3">
+          <div className="rounded-lg border bg-card p-6 text-center">
+            <div className="text-3xl font-bold text-primary mb-2">
+              {recentPrompts.length}
             </div>
+            <p className="text-sm text-muted-foreground">Total Conversions</p>
+          </div>
+
+          <div className="rounded-lg border bg-card p-6 text-center">
+            <div className="text-3xl font-bold text-green-500 mb-2">
+              {recentPrompts.filter(p => p.ai_processing_status === "completed").length}
+            </div>
+            <p className="text-sm text-muted-foreground">Successful</p>
+          </div>
+
+          <div className="rounded-lg border bg-card p-6 text-center">
+            <div className="text-3xl font-bold text-blue-500 mb-2">
+              {uploadResult ? "1" : "0"}
+            </div>
+            <p className="text-sm text-muted-foreground">Active Sessions</p>
           </div>
         </div>
       </main>
