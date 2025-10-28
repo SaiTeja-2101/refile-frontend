@@ -1,12 +1,17 @@
 "use client";
 
-import { CheckCircle2, Copy, Terminal, FileInput, FileOutput, AlertCircle, Sparkles } from "lucide-react";
+import { CheckCircle2, Copy, Terminal, FileInput, FileOutput, AlertCircle, Sparkles, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
 
 export function AIResponse({ result, status = "completed" }) {
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState({}); // map filename -> bool
+  const [savingPreset, setSavingPreset] = useState(false);
+  const router = useRouter();
+  const { isAuthenticated, user } = useAuth();
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -32,6 +37,30 @@ export function AIResponse({ result, status = "completed" }) {
     navigator.clipboard.writeText(linux_command || "");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSaveAsPreset = async () => {
+    if (!isAuthenticated) {
+      alert('Please sign in to save presets');
+      return;
+    }
+
+    if (!ai_response.command_template) {
+      alert('Command template is not available for this response');
+      return;
+    }
+
+    // Redirect to preset creation page with pre-filled data
+    const presetData = {
+      command_template: ai_response.command_template,
+      description: ai_response.description || '',
+      input_files: ai_response.input_files || [],
+      output_files: ai_response.output_files || []
+    };
+
+    // Store in sessionStorage to pass to create page
+    sessionStorage.setItem('preset_draft', JSON.stringify(presetData));
+    router.push('/presets/create');
   };
 
   const handleDownload = async (file) => {
@@ -121,6 +150,22 @@ export function AIResponse({ result, status = "completed" }) {
             <h3 className="font-semibold">What this does:</h3>
           </div>
           <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+      )}
+
+      {/* Save as Preset Button */}
+      {linux_command && ai_response.command_template && (
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            variant="default"
+            onClick={handleSaveAsPreset}
+            disabled={savingPreset || !isAuthenticated}
+            className="gap-2"
+          >
+            <Save className="h-4 w-4" />
+            {savingPreset ? "Saving..." : "Save as Preset"}
+          </Button>
         </div>
       )}
 

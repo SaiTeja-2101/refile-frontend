@@ -35,6 +35,40 @@ export default function CreatePresetPage() {
     }
   }, [isAuthenticated]);
 
+  // Load draft data from sessionStorage if available
+  useEffect(() => {
+    const draftData = sessionStorage.getItem('preset_draft');
+    if (draftData) {
+      try {
+        const draft = JSON.parse(draftData);
+        setFormData(prev => ({
+          ...prev,
+          command_template: draft.command_template || '',
+          description: draft.description || '',
+          // Auto-populate input/output patterns from AI response if available
+          input_file_patterns: draft.input_files && draft.input_files.length > 0
+            ? draft.input_files.map(file => ({
+                name: "input_file",
+                extensions: [],
+                description: `Input: ${file}`
+              }))
+            : prev.input_file_patterns,
+          output_file_patterns: draft.output_files && draft.output_files.length > 0
+            ? draft.output_files.map((file, idx) => ({
+                name: `output_file_${idx + 1}`,
+                template: typeof file === 'string' ? file : (file.original_filename || file.stored_filename || ''),
+                description: `Output: ${typeof file === 'string' ? file : (file.original_filename || '')}`
+              }))
+            : prev.output_file_patterns
+        }));
+        // Clear the draft after loading
+        sessionStorage.removeItem('preset_draft');
+      } catch (e) {
+        console.error('Failed to parse preset draft:', e);
+      }
+    }
+  }, []);
+
   const categories = [
     { value: "image", label: "Image Processing" },
     { value: "video", label: "Video Processing" },
