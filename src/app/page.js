@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Paperclip, ArrowRight, Upload, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,18 +17,60 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  
+  // Get current user session
+  useEffect(() => {
+    const fetchSession = async () => {
+      try {
+        const response = await fetch('/api/session');
+        if (response.ok) {
+          const { session, user } = await response.json();
+          if (session && user) {
+            setCurrentUser(user);
+            // Store user ID for components that need it
+            localStorage.setItem('user_id', user.id);
+          } else {
+            // Guest user - create a temporary ID
+            const guestId = `guest_${Date.now()}`;
+            localStorage.setItem('user_id', guestId);
+            setCurrentUser({ id: guestId, name: 'Guest User' });
+          }
+        } else {
+          // Fallback to guest
+          const guestId = `guest_${Date.now()}`;
+          localStorage.setItem('user_id', guestId);
+          setCurrentUser({ id: guestId, name: 'Guest User' });
+        }
+      } catch (error) {
+        console.error('Failed to fetch session:', error);
+        // Fallback to guest
+        const guestId = `guest_${Date.now()}`;
+        localStorage.setItem('user_id', guestId);
+        setCurrentUser({ id: guestId, name: 'Guest User' });
+      }
+    };
+
+    fetchSession();
+  }, []);
   
   // Debug logging
   console.log("🔐 Auth Status:", isAuthenticated);
+  console.log("👤 Current User:", currentUser);
 
   const handleQuickUpload = async (files, prompt) => {
+    if (!currentUser) {
+      setError("Please wait for authentication to complete");
+      return;
+    }
+
     setIsProcessing(true);
     setError(null);
     setResult(null);
 
     try {
       const API_URL = 'http://localhost:8000';
-      const userId = isAuthenticated ? 'authenticated_user' : `guest_${Date.now()}`;
+      const userId = currentUser.id;
       
       console.log("📤 Step 1: Uploading files...");
       

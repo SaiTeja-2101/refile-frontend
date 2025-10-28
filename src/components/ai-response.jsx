@@ -6,6 +6,9 @@ import { useState } from "react";
 
 export function AIResponse({ result, status = "completed" }) {
   const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState({}); // map filename -> bool
+
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   if (!result) return null;
 
@@ -29,6 +32,61 @@ export function AIResponse({ result, status = "completed" }) {
     navigator.clipboard.writeText(linux_command || "");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = async (file) => {
+    // file can be a string (legacy) or an object with stored_filename + original_filename
+    let storedFilename = null;
+    let originalFilename = null;
+
+    if (typeof file === 'string') {
+      storedFilename = file;
+      originalFilename = file;
+    } else if (file && typeof file === 'object') {
+      // prefer stored_filename (UUID name) for download path
+      storedFilename = file.stored_filename || file.storedFilename || file.storedName || file.filename || file.name;
+      originalFilename = file.original_filename || file.originalFilename || file.filename || file.name || storedFilename;
+    }
+
+    if (!storedFilename) {
+      // fallback label
+      storedFilename = originalFilename || 'file';
+    }
+
+    // Get user ID from localStorage (set by page.js session check)
+    const userId = localStorage.getItem('user_id');
+    if (!userId) {
+      alert('User not authenticated. Please refresh the page.');
+      return;
+    }
+
+    const downloadUrl = `${API_BASE}/files/${encodeURIComponent(userId)}/${encodeURIComponent(storedFilename)}`;
+
+    try {
+      setDownloading((d) => ({ ...d, [storedFilename]: true }));
+      const res = await fetch(downloadUrl, {
+        headers: {
+          'x-user-id': userId,
+        },
+      });
+
+      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = originalFilename || storedFilename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download error', err);
+      alert('Failed to download file: ' + (err.message || err));
+    } finally {
+      setDownloading((d) => ({ ...d, [storedFilename]: false }));
+    }
   };
 
   return (
@@ -128,30 +186,27 @@ export function AIResponse({ result, status = "completed" }) {
             </div>
             <div className="space-y-2">
               {output_files.map((file, index) => {
-                const fileName = typeof file === 'string' ? file : file.filename || file.name || 'Generated file';
-                const isFileObject = typeof file === 'object' && file.filename;
-                
+                const isString = typeof file === 'string';
+                const storedFilename = isString ? file : (file.stored_filename || file.storedFilename || file.storedName || file.filename || file.name);
+                const originalFilename = isString ? file : (file.original_filename || file.originalFilename || file.filename || file.name || storedFilename);
+
                 return (
                   <div
                     key={index}
                     className="text-sm p-2 rounded bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 flex items-center justify-between"
                   >
-                    <span>📁 {fileName}</span>
-                    {isFileObject && (
+                    <span className="truncate">📁 {originalFilename}</span>
+                    <div className="flex items-center gap-2">
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => {
-                          // Get user ID from localStorage or context
-                          const userId = localStorage.getItem('user_id') || 'test-user';
-                          const downloadUrl = `http://localhost:8000/files/${userId}/${fileName}`;
-                          window.open(downloadUrl, '_blank');
-                        }}
+                        onClick={() => handleDownload(file)}
                         className="gap-1 h-7 px-2 text-xs"
+                        disabled={Boolean(downloading[storedFilename])}
                       >
-                        📥 Download
+                        {downloading[storedFilename] ? 'Downloading...' : '📥 Download'}
                       </Button>
-                    )}
+                    </div>
                   </div>
                 );
               })}
