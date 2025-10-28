@@ -1,13 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Moon, Sun, Search, Settings, User, History } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 
 export function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
+
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
 
   const FilePenIcon = () => (
     <svg
@@ -29,10 +39,14 @@ export function Navbar() {
   );
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-white/10 bg-background/80 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 w-full border-b backdrop-blur-md" style={{
+      borderColor: 'var(--border)',
+      backgroundColor: 'var(--background)',
+      opacity: 0.95
+    }}>
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
         {/* Left: Logo */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" style={{ color: 'var(--foreground)' }}>
           <FilePenIcon />
           <span className="text-xl font-bold">ReFile</span>
         </div>
@@ -53,10 +67,17 @@ export function Navbar() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            onClick={toggleTheme}
+            aria-label="Toggle theme"
+            className="relative"
           >
-            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            {!mounted ? (
+              <div className="h-5 w-5" />
+            ) : theme === 'dark' ? (
+              <Sun className="h-5 w-5 transition-transform hover:rotate-12" />
+            ) : (
+              <Moon className="h-5 w-5 transition-transform hover:-rotate-12" />
+            )}
           </Button>
 
           {/* Conditional Rendering based on login state */}
@@ -73,12 +94,22 @@ export function Navbar() {
             <>
               <Button
                 variant="outline"
-                className="hidden rounded-full border-white/20 px-5 hover:bg-white/10 md:inline-flex"
+                className="hidden rounded-full px-5 md:inline-flex"
+                style={{
+                  borderColor: 'var(--border)',
+                  color: 'var(--foreground)'
+                }}
               >
                 <User className="h-4 w-4" />
                 Sign up
               </Button>
-              <Button className="rounded-full bg-white px-5 text-black hover:bg-white/90">
+              <Button 
+                className="rounded-full px-5"
+                style={{
+                  backgroundColor: 'var(--primary)',
+                  color: 'var(--primary-foreground)'
+                }}
+              >
                 Sign in
               </Button>
             </>
