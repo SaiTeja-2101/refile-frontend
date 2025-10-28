@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Moon, Sun, Search, Settings, User, History, LogOut } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export function Navbar() {
   const [user, setUser] = useState(null);
@@ -144,14 +145,20 @@ export function Navbar() {
               {/* Profile Picture and Logout Menu */}
               <div className="flex items-center gap-2">
                 {user?.picture ? (
-                  <div className="relative">
-                    <img
-                      src={user.picture}
-                      alt={user.name || 'Profile'}
-                      className="h-8 w-8 rounded-full border-2 border-gray-200 dark:border-gray-700"
-                      title={user.name || user.email}
+                  <Avatar className="h-8 w-8 border-2 border-gray-200 dark:border-gray-700">
+                    <AvatarImage 
+                      src={user.picture} 
+                      alt={user.name || 'Profile'} 
                     />
-                  </div>
+                    <AvatarFallback>
+                      {user.name 
+                        ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                        : user.email 
+                          ? user.email[0].toUpperCase()
+                          : 'U'
+                      }
+                    </AvatarFallback>
+                  </Avatar>
                 ) : (
                   <Button variant="ghost" size="icon">
                     <User className="h-5 w-5" />
