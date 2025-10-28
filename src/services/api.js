@@ -40,12 +40,13 @@ export async function uploadFiles(files, prompt, userId) {
   // Step 2: Process with AI
   console.log("🤖 Step 2: Processing with AI...");
   
-  const fileNames = uploadResult.files.map(f => f.original_filename);
+  const fileNames = uploadResult.files.map(f => f.stored_filename);
   
   const processFormData = new FormData();
   processFormData.append('prompt', prompt);
   processFormData.append('uploaded_files', JSON.stringify(fileNames));
-
+  console.log("🐛 DEBUG - Sending to process endpoint:", JSON.stringify(fileNames));
+  console.log("🐛 DEBUG - FormData uploaded_files:", processFormData.get('uploaded_files'));
   const processResponse = await fetch(`${API_BASE_URL}/api/process`, {
     method: 'POST',
     headers: {

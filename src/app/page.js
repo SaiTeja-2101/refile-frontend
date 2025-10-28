@@ -99,7 +99,7 @@ export default function Home() {
       // Step 2: Process with AI
       console.log("🤖 Step 2: Processing with AI...");
       
-      const fileNames = uploadResult.files.map(f => f.original_filename);
+      const fileNames = uploadResult.files.map(f => f.stored_filename);
       
       const processFormData = new FormData();
       processFormData.append('prompt', prompt);
