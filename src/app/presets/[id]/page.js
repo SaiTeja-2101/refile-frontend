@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { ArrowLeft, Heart, Play, Share2, Edit, Trash2, Flag, Download, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +10,8 @@ import { Navbar } from "@/components/navbar";
 import { Sidebar } from "@/components/sidebar";
 import { useAuth } from "@/contexts/auth-context";
 
-export default function PresetDetailPage({ params }) {
+export default function PresetDetailPage(props) {
+  const params = use(props.params);
   const { isAuthenticated, user } = useAuth();
   const [preset, setPreset] = useState(null);
   const [loading, setLoading] = useState(true);

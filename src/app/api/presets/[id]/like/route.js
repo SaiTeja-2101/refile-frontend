@@ -1,7 +1,8 @@
 import { getCurrentSession } from "@/lib/server/session";
 import { presetLikesDb } from "@/db/presets";
 
-export async function POST(request, { params }) {
+export async function POST(request, props) {
+  const params = await props.params;
   try {
     const { session, user } = await getCurrentSession();
     
