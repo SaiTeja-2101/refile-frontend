@@ -7,8 +7,18 @@ import { FileUpload } from "@/components/file-upload";
 import { AIResponse } from "@/components/ai-response";
 import { uploadFiles, listPrompts } from "@/services/api";
 import { useStatusPolling } from "@/hooks/use-status-polling";
-import { FileText, Upload, History, Sparkles } from "lucide-react";
+import { FileText, Upload, History, Sparkles, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+// Configuration
+const MAX_RECENT_PROMPTS = 10; // Maximum number of recent prompts to display
+
+// Status constants
+const PROCESSING_STATUS = {
+  COMPLETED: "completed",
+  PENDING: "pending",
+  FAILED: "failed",
+};
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
@@ -49,7 +59,7 @@ export default function Dashboard() {
     try {
       const response = await listPrompts(userId);
       if (response.status === "ok" && response.items) {
-        setRecentPrompts(response.items.slice(0, 5)); // Show last 5
+        setRecentPrompts(response.items.slice(0, MAX_RECENT_PROMPTS));
       }
     } catch (err) {
       console.error("Failed to load prompts:", err);
@@ -82,6 +92,42 @@ export default function Dashboard() {
   const handleReset = () => {
     setUploadResult(null);
     setError(null);
+  };
+
+  const handleNewChat = () => {
+    // Reset the current upload result to start a new conversation
+    setUploadResult(null);
+    setError(null);
+    // Scroll to top to focus on file upload
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleChatClick = (item) => {
+    // Load the chat/conversation by setting it as the current upload result
+    // The AIResponse component expects specific structure
+    const chatResult = {
+      id: item.id,
+      ai_response: {
+        linux_command: item.ai_command,
+        command_template: item.command_template || item.ai_command,
+        input_files: [],
+        output_files: [],
+        description: item.ai_response || "Previous conversation",
+        ai_processing_status: item.ai_processing_status || PROCESSING_STATUS.COMPLETED
+      },
+      prompt: item.prompt,
+      files: [{
+        id: item.id,
+        original_filename: item.original_filename,
+        stored_filename: item.stored_filename
+      }]
+    };
+    
+    setUploadResult(chatResult);
+    setError(null);
+    
+    // Scroll to view the response
+    window.scrollTo({ top: 200, behavior: 'smooth' });
   };
 
   if (isLoading) {
@@ -140,16 +186,27 @@ export default function Dashboard() {
             {/* Recent Files */}
             {recentPrompts.length > 0 && (
               <div className="rounded-lg border bg-card p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <History className="h-5 w-5 text-blue-500" />
-                  <h3 className="font-semibold">Recent Uploads</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <History className="h-5 w-5 text-blue-500" />
+                    <h3 className="font-semibold">Chat History</h3>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleNewChat}
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    New Chat
+                  </Button>
                 </div>
                 <div className="space-y-2">
                   {recentPrompts.map((item) => (
                     <div
                       key={item.id}
-                      className="p-3 rounded-lg bg-muted/50 border cursor-pointer hover:bg-muted transition-colors"
-                      onClick={() => setUploadResult({ id: item.id, ai_response: item })}
+                      className="p-3 rounded-lg bg-muted/50 border cursor-pointer hover:bg-muted hover:border-primary/50 transition-all"
+                      onClick={() => handleChatClick(item)}
                     >
                       <p className="text-sm font-medium truncate">{item.prompt}</p>
                       <p className="text-xs text-muted-foreground">
@@ -185,7 +242,7 @@ export default function Dashboard() {
 
                 <AIResponse 
                   result={uploadResult} 
-                  status={uploadResult.ai_response?.ai_processing_status || "completed"} 
+                  status={uploadResult.ai_response?.ai_processing_status || PROCESSING_STATUS.COMPLETED} 
                 />
               </div>
             ) : (
@@ -213,14 +270,14 @@ export default function Dashboard() {
 
           <div className="rounded-lg border bg-card p-6 text-center">
             <div className="text-3xl font-bold text-green-500 mb-2">
-              {recentPrompts.filter(p => p.ai_processing_status === "completed").length}
+              {recentPrompts.filter(p => p.ai_processing_status === PROCESSING_STATUS.COMPLETED).length}
             </div>
             <p className="text-sm text-muted-foreground">Successful</p>
           </div>
 
           <div className="rounded-lg border bg-card p-6 text-center">
             <div className="text-3xl font-bold text-blue-500 mb-2">
-              {uploadResult ? "1" : "0"}
+              {uploadResult ? 1 : 0}
             </div>
             <p className="text-sm text-muted-foreground">Active Sessions</p>
           </div>

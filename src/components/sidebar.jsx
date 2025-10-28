@@ -6,7 +6,6 @@ import {
   MessageSquare, 
   Moon, 
   Sun, 
-  History as HistoryIcon,
   ChevronLeft,
   FilePen,
   LogOut,
@@ -20,13 +19,6 @@ export function Sidebar() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isManuallyCollapsed, setIsManuallyCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [historyItems] = useState([
-    "Security Level Reassignment",
-    "Combinational 4-Bit Arithmetic",
-    "Latex Resume Template for",
-    "ATS Resume Scoring and Op",
-    "4-Bit Arithmetic Circuit Des"
-  ]);
   const { theme, setTheme } = useTheme();
   const { logout } = useAuth();
 
@@ -108,6 +100,7 @@ export function Sidebar() {
             e.currentTarget.style.backgroundColor = 'transparent';
             e.currentTarget.style.color = 'var(--muted-foreground)';
           }}
+          onClick={() => window.location.href = '/'}
         >
           <MessageSquare className="h-5 w-5 shrink-0" />
           <AnimatePresence>
@@ -196,75 +189,6 @@ export function Sidebar() {
             )}
           </AnimatePresence>
         </button>
-
-        {/* History Section */}
-        <div className="pt-4">
-          <button 
-            className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all"
-            style={{
-              color: 'var(--muted-foreground)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--accent)';
-              e.currentTarget.style.color = 'var(--accent-foreground)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = 'var(--muted-foreground)';
-            }}
-          >
-            <HistoryIcon className="h-5 w-5 shrink-0" />
-            <AnimatePresence>
-              {isExpanded && (
-                <motion.span
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: "auto" }}
-                  exit={{ opacity: 0, width: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="overflow-hidden whitespace-nowrap font-medium"
-                >
-                  History
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </button>
-
-          {/* History Items */}
-          <AnimatePresence>
-            {isExpanded && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2 }}
-                className="mt-2 space-y-1 overflow-hidden"
-              >
-                <div className="px-3 py-1 text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>
-                  October
-                </div>
-                {historyItems.map((item, index) => (
-                  <button
-                    key={index}
-                    className="flex w-full items-start rounded-lg px-3 py-2 text-left text-sm transition-all"
-                    style={{
-                      color: 'var(--muted-foreground)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--accent)';
-                      e.currentTarget.style.color = 'var(--accent-foreground)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = 'var(--muted-foreground)';
-                    }}
-                  >
-                    <span className="line-clamp-1">{item}</span>
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
       </nav>
 
       {/* Bottom Section - User Profile & Collapse Button */}

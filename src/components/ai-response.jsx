@@ -195,7 +195,7 @@ export function AIResponse({ result, status = "completed" }) {
           </div>
 
           <div className="text-xs text-muted-foreground">
-            💡 Copy this command and run it in your terminal
+            Copy this command and run it in your terminal
           </div>
         </div>
       )}

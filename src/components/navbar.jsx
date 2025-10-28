@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Moon, Sun, Search, Settings, User, History, LogOut } from "lucide-react";
+import { Moon, Sun, Search, Settings, User, LogOut } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -138,10 +138,6 @@ export function Navbar() {
           {/* Conditional Rendering based on login state */}
           {isLoggedIn ? (
             <>
-              <Button variant="ghost" size="icon" className="hidden md:inline-flex">
-                <History className="h-5 w-5" />
-              </Button>
-              
               {/* Profile Picture and Logout Menu */}
               <div className="flex items-center gap-2">
                 {user?.picture ? (
