@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { Upload, X, FileText, Image, Video, Music, File } from "lucide-react";
+import { useState, useCallback, useRef } from "react";
+import { Upload, X, FileText, Image, Video, Music, File, Mic, Send, Trash, MessageSquare } from "lucide-react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -24,6 +25,18 @@ export function FileUpload({ onUpload, isUploading = false }) {
   const [files, setFiles] = useState([]);
   const [prompt, setPrompt] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  
+  // Voice recording state
+  const [mode, setMode] = useState('text'); // 'text' or 'voice'
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [helperText, setHelperText] = useState("Press and hold to talk");
+  const [mediaStream, setMediaStream] = useState(null);
+  
+  // Refs for voice recording
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const micContainerRef = useRef(null);
 
   const handleDragOver = useCallback((e) => {
     e.preventDefault();
@@ -60,6 +73,95 @@ export function FileUpload({ onUpload, isUploading = false }) {
 
   const removeFile = (index) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Voice recording handlers
+  const handleStartRecording = async () => {
+    setHelperText("Slide right to send, left to cancel");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setMediaStream(stream);
+      setIsRecording(true);
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+      mediaRecorder.start();
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+      setHelperText("Microphone access denied.");
+    }
+  };
+
+  const handleStopRecording = async (action) => {
+    if (!mediaRecorderRef.current) return;
+
+    const recorder = mediaRecorderRef.current;
+    
+    recorder.onstop = async () => {
+      mediaStream?.getTracks().forEach((track) => track.stop());
+      setIsRecording(false);
+      setMediaStream(null);
+      setHelperText("Press and hold to talk");
+    
+      if (action === "cancel" || audioChunksRef.current.length === 0) {
+        audioChunksRef.current = [];
+        return;
+      }
+    
+      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+      audioChunksRef.current = [];
+    
+      try {
+        setIsTranscribing(true);
+        setPrompt("Transcribing...");
+        
+        const formData = new FormData();
+        formData.append("audio", audioBlob, "recording.webm");
+        const transcribeResponse = await fetch("/api/transcribe", { 
+          method: "POST", 
+          body: formData 
+        });
+        
+        if (!transcribeResponse.ok) throw new Error("Transcription failed");
+        const { text: transcribedText } = await transcribeResponse.json();
+        
+        setPrompt(transcribedText);
+        
+        // Auto-start processing if files are already selected
+        if (files.length > 0) {
+          await onUpload(files, transcribedText);
+          setFiles([]);
+          setPrompt("");
+        }
+        
+      } catch (err) {
+        console.error("Error in transcription:", err);
+        setPrompt("Error transcribing audio. Please try again.");
+      } finally {
+        setIsTranscribing(false);
+      }
+    };
+    
+    recorder.stop();
+  };
+
+  const handleDragEnd = (_, info) => {
+    if (!isRecording) return;
+    const offset = info.offset.x;
+    const threshold = 100;
+
+    if (offset > threshold) handleStopRecording("send");
+    else handleStopRecording("cancel");
+  };
+
+  const handleDrag = (_, info) => {
+    if (!isRecording) return;
+    const offset = info.offset.x;
+    if (offset > 100) setHelperText("Release to send");
+    else if (offset < -100) setHelperText("Release to cancel");
+    else setHelperText("Slide right to send, left to cancel");
   };
 
   const handleSubmit = async (e) => {
@@ -164,31 +266,109 @@ export function FileUpload({ onUpload, isUploading = false }) {
         </div>
       )}
 
+      {/* Mode Toggle */}
+      <div className="flex items-center justify-center gap-3 p-4 bg-muted/20 rounded-lg">
+        <Button
+          type="button"
+          variant={mode === 'text' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setMode('text')}
+          className="flex items-center gap-2"
+        >
+          <MessageSquare className="h-4 w-4" />
+          Type
+        </Button>
+        <Button
+          type="button"
+          variant={mode === 'voice' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setMode('voice')}
+          className="flex items-center gap-2"
+        >
+          <Mic className="h-4 w-4" />
+          Voice
+        </Button>
+      </div>
+
       {/* Prompt Input */}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <label htmlFor="prompt" className="text-sm font-medium">
             What do you want to do with {files.length > 0 ? "these files" : "your files"}?
           </label>
-          <textarea
-            id="prompt"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="E.g., 'Extract audio from this video' or 'Resize these images to 800x600' or 'Merge these PDFs into one file'"
-            className="w-full min-h-[100px] p-3 rounded-lg border bg-background resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-            disabled={isUploading}
-          />
+          
+          {mode === 'voice' ? (
+            // Voice Input Slider
+            <div className="w-full flex flex-col items-center gap-4 p-4 border rounded-lg bg-background">
+              <p className="text-sm text-muted-foreground h-5">{helperText}</p>
+              <div
+                ref={micContainerRef}
+                className="w-80 h-16 rounded-full flex items-center justify-center bg-muted relative overflow-hidden select-none"
+              >
+                <div className="absolute left-0 top-0 h-full w-1/2 bg-red-500/20 flex items-center justify-start pl-6 text-red-500">
+                  <Trash />
+                </div>
+                <div className="absolute right-0 top-0 h-full w-1/2 bg-green-500/20 flex items-center justify-end pr-6 text-green-500">
+                  <Send />
+                </div>
+
+                <motion.div
+                  className={`w-16 h-16 rounded-full flex items-center justify-center cursor-pointer touch-none z-10 ${
+                    isRecording ? 'bg-red-500' : 'bg-primary'
+                  }`}
+                  onPointerDown={handleStartRecording}
+                  drag="x"
+                  dragConstraints={micContainerRef}
+                  dragSnapToOrigin
+                  onDragEnd={handleDragEnd}
+                  onDrag={handleDrag}
+                  whileTap={{ scale: 1.1 }}
+                  dragElastic={0.2}
+                  disabled={isUploading || isTranscribing}
+                >
+                  <Mic className="text-primary-foreground" />
+                </motion.div>
+              </div>
+              
+              {/* Show transcribed text */}
+              {prompt && (
+                <div className="w-full p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                  <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                    {isTranscribing ? "Transcribing..." : "Transcribed:"}
+                  </p>
+                  <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                    {prompt}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            // Text Input
+            <textarea
+              id="prompt"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="E.g., 'Extract audio from this video' or 'Resize these images to 800x600' or 'Merge these PDFs into one file'"
+              className="w-full min-h-[100px] p-3 rounded-lg border bg-background resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+              disabled={isUploading || isTranscribing}
+            />
+          )}
         </div>
 
         <Button
           type="submit"
           className="w-full"
-          disabled={isUploading || files.length === 0 || !prompt.trim()}
+          disabled={isUploading || isTranscribing || files.length === 0 || !prompt.trim()}
         >
           {isUploading ? (
             <>
               <span className="animate-spin mr-2">⏳</span>
               Processing...
+            </>
+          ) : isTranscribing ? (
+            <>
+              <span className="animate-spin mr-2">🎤</span>
+              Transcribing...
             </>
           ) : (
             <>
