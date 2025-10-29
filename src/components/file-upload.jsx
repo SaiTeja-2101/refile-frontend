@@ -32,6 +32,7 @@ export function FileUpload({ onUpload, isUploading = false }) {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [helperText, setHelperText] = useState("Press and hold to talk");
   const [mediaStream, setMediaStream] = useState(null);
+  const [selectedLanguage, setSelectedLanguage] = useState("auto"); // Default to auto-detect
   
   // Refs for voice recording
   const mediaRecorderRef = useRef(null);
@@ -119,6 +120,7 @@ export function FileUpload({ onUpload, isUploading = false }) {
         
         const formData = new FormData();
         formData.append("audio", audioBlob, "recording.webm");
+        formData.append("language", selectedLanguage); // Include language preference
         const transcribeResponse = await fetch("/api/transcribe", { 
           method: "POST", 
           body: formData 
@@ -299,7 +301,36 @@ export function FileUpload({ onUpload, isUploading = false }) {
           
           {mode === 'voice' ? (
             // Voice Input Slider
-            <div className="w-full flex flex-col items-center gap-4 p-4 border rounded-lg bg-background">
+            <div className="w-full space-y-4">
+              {/* Language Selector */}
+              <div className="flex items-center gap-3">
+                <label htmlFor="language-select" className="text-sm font-medium whitespace-nowrap">
+                  Transcription Language:
+                </label>
+                <select
+                  id="language-select"
+                  value={selectedLanguage}
+                  onChange={(e) => setSelectedLanguage(e.target.value)}
+                  className="flex-1 p-2 rounded-lg border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  disabled={isRecording || isTranscribing}
+                >
+                  <option value="auto">🌐 Auto-detect</option>
+                  <option value="en">🇬🇧 English</option>
+                  <option value="hi">🇮🇳 Hindi (हिन्दी)</option>
+                  <option value="ta">🇮🇳 Tamil (தமிழ்)</option>
+                  <option value="te">🇮🇳 Telugu (తెలుగు)</option>
+                  <option value="kn">🇮🇳 Kannada (ಕನ್ನಡ)</option>
+                  <option value="ml">🇮🇳 Malayalam (മലയാളം)</option>
+                  <option value="mr">🇮🇳 Marathi (मराठी)</option>
+                  <option value="bn">🇮🇳 Bengali (বাংলা)</option>
+                  <option value="gu">🇮🇳 Gujarati (ગુજરાતી)</option>
+                  <option value="pa">🇮🇳 Punjabi (ਪੰਜਾਬੀ)</option>
+                  <option value="ur">🇮🇳 Urdu (اردو)</option>
+                </select>
+              </div>
+
+              {/* Voice Recording UI */}
+              <div className="w-full flex flex-col items-center gap-4 p-4 border rounded-lg bg-background">
               <p className="text-sm text-muted-foreground h-5">{helperText}</p>
               <div
                 ref={micContainerRef}
@@ -341,6 +372,7 @@ export function FileUpload({ onUpload, isUploading = false }) {
                   </p>
                 </div>
               )}
+              </div>
             </div>
           ) : (
             // Text Input
